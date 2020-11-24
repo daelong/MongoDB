@@ -159,4 +159,97 @@ var showPage = function(page){
 ... } 이런식으로 응용하여 사용 가능 
 
 
+update() : Collection 안의 document(들)을 수정합니다. 이 메소드를 통하여 특정 field 를 수정 할 수도 있고 이미 존재하는 document를 대체(replace) 할 수도 있습니다.
+db.collection.update(
+   <query>,
+   <update>,
+   {
+     upsert: <boolean>,
+     multi: <boolean>,
+     writeConcern: <document>
+   }
+)
+*query	document	업데이트 할 document의 criteria 를 정합니다. find() 메소드 에서 사용하는 query 와 같습니다.
+*update	document	document에 적용할 변동사항입니다.
+upsert	boolean	Optional. (기본값: false) 이 값이 true 로 설정되면 query한 document가 없을 경우, 새로운 document를 추가합니다.
+multi	boolean	Optional. (기본값: false)  이 값이 true 로 설정되면, 여러개의 document 를 수정합니다.
+writeConcern	document	Optional.  wtimeout 등 document 업데이트 할 때 필요한 설정값입니다. 기본 writeConcern을 사용하려면 이 파라미터를 생략하세요. 
+
+db.people.update( { name: "Abet" }, { $set: { age: 20 } } ) : name이 Abet을 찾아서 age를 20으로 설정
+특정 field의 값을 수정할 땐 $set 연산자를 사용한다. 
+
+document를 replace하기
+db.people.update( { name: "Betty" }, { "name": "Betty 2nd", age: 1 }) : name이 Betty을 찾아서 Betty 2nd로 변경하고 age를 1로 변경하기(특정 field를 바꾸는게 아니라 두개의 field를 바꾸니 $set을 안씀)
+
+특정 field를 제거하기
+db.people.update( { name: "David" }, { $unset: { score: 1 } } ) : name이 David를 찾아서 score를 삭제(unset)하기 1은 true의 의미이다.
+
+criteria에 해당되는 document가 존재하지 않는다면 새로 추가하기
+db.people.update( { name: "Elly" }, { name: "Elly", age: 17 }, { upsert: true } ) : name이 Elly를 찾아서 age 17로 수정, criteria에 해당하는 document가 없을경우 추가(upsert:true)
+
+여러 document의 특정 field를 수정하기
+db.people.update(
+... { age: { $lte: 20 } },
+... { $set: { score: 10 } },
+... { multi: true }
+... ) : age가 20이하인 애들을 찾아서 score를 10으로 부여, 여러 document수정(multi: true)
+
+배열에 값 추가하기
+db.people.update(
+... { name: "Charlie" },
+... { $push: { skills: "angularjs" } }
+... ) : name이 Charlie를 찾아서 skilss가 배열이니 거기에 angularjs 하나를 추가해주기
+
+배열에 값 여러개 추가하기 + 오름차순으로 정렬하기
+db.people.update(
+... { name: "Charlie" },
+... { $push: {
+...     skills: {
+...         $each: [ "c++", "java" ],
+...         $sort: 1
+...     }
+...   }
+... }
+... ) : name인 Charlie를 찾아서 추가하는 스킬이 여러개이니 각각의 것들을 푸쉬해준다는 의미로 $each를 쓰고 $sort: 1로 오름차순 정렬함(내림차순은 -1, 배열이 document의 배열이고 특정 필드에 따라 정렬할 때는 $sort: { KEY: 1 }이렇게 사용하면 된다.)
+
+배열에 값 제거하기
+db.people.update(
+... { name: "Charlie" },
+... { $pull: { skills: "mongodb" } }
+... ) : $pull로 배열의 값을 빼줌
+
+배열에서 값 여러개 제거하기
+db.people.update(
+... { name: "Charlie" },
+... { $pull: { skills: { $in: ["angularjs", "java" ] } } }
+... ) :  $‌in안에 있는 값들 $pull로 빼냄
+
+index 설정
+index는 mongodb에서 데이터 쿼리를 더욱 효율적으로 할 수 있게 해준다. 
+document의 개수가 많으면 속도처리가 느려지는 부분들을 향상시킬 수 있다.
+
+기본 인덱스 _id
+모든 MongoDB의 컬렉션은 기본적으로 _id 필드에 인덱스가 존재합니다. 만약에 컬렉션을 만들 때  _id 필드를 따로 지정하지 않으면 mongod드라이버가 자동으로 _id 필드 값을 ObjectId로 설정해줍니다.
+
+_id 인덱스는 unique(유일)하고 이는 MongoDB 클라이언트가 같은 _id 를 가진 문서를 중복적으로 추가하는 것을 방지합니다.
+
+Single(단일) 필드 인덱스
+MongoDB 드라이버가 지정하는 _id 인덱스 외에도, 사용자가 지정 할 수 있는 단일 필드 인덱스가 있습니다.
+
+Compound (복합)  필드 인덱스
+두개 이상의 필드를 사용하는 인덱스를 복합 인덱스라고 부릅니다. 다음 이미지와 같이 첫번째 필드 (userid)는 오름차순으로, 두번째 필드 (score)는 내림차순으로 정렬 해야 하는 상황이 있을때 사용합니다
+
+Multikey 인덱스
+필드 타입이 배열인 필드에 인덱스를 적용 할 때는 Multikey 인덱스가 사용됩니다. 이 인덱스를 통하여 배열에 특정 값이 포함되어 있는 document를 효율적으로 스캔 할 수 있습니다.
+
+Geospatial(공간적) Index
+지도의 좌표와 같은 데이터를 효율적으로 쿼리하기 위해서 (예: 특정 좌표 반경 x 에 해당되는 데이터를 찾을 때) 사용되는 인덱스입니다. 
+
+Text 인덱스
+텍스트 관련 데이터를 효율적으로 쿼리하기 위한 인덱스입니다.
+
+해쉬 (hashed) 인덱스
+이 인덱스를 사용하면 B Tree가아닌 Hash 자료구조를 사용합니다. Hash는 검색 효율이 B Tree보다 좋지만, 정렬을 하지 않습니다
+
+createIndex() : 인덱스 생성, 파라미터는 인덱스를 적용할 필드를 전달한다. 값이 1이면 오름차순, -1이면 내림차순이다.
 
